@@ -18,9 +18,6 @@ RUN npm prune --production
 # Make CLI globally available
 RUN npm link
 
-# Copy runtime config
-COPY config ./config
-
 RUN mkdir -p /etc/mcm-agent
 
 EXPOSE 3000
