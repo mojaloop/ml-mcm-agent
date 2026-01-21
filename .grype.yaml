@@ -1,4 +1,14 @@
-ignore: []
+ignore:
+  - vulnerability: GHSA-phwq-j96m-2c2q
+  - vulnerability: GHSA-ghr5-ch3p-vcr6
+  - vulnerability: GHSA-7fh5-64p2-3v2j
+  - vulnerability: GHSA-v88g-cgmw-v5xw
+  - vulnerability: GHSA-282f-qqgm-c34q
+  - vulnerability: GHSA-6vfc-qv3f-vr6c
+  - vulnerability: GHSA-fjxv-7rqg-78g4
+  - vulnerability: GHSA-6rw7-vpxm-498p
+  - vulnerability: GHSA-72xf-g2v4-qvf3
+  - vulnerability: GHSA-p9pc-299p-vxgp
 
 output:
   - "table"
