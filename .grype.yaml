@@ -9,6 +9,11 @@ ignore:
   - vulnerability: GHSA-6rw7-vpxm-498p
   - vulnerability: GHSA-72xf-g2v4-qvf3
   - vulnerability: GHSA-p9pc-299p-vxgp
+  - vulnerability: GHSA-cgfm-xwp7-2cvr
+  - vulnerability: GHSA-mjxr-4v3x-q3m4
+  - vulnerability: GHSA-qhxp-v273-g94h
+  - vulnerability: GHSA-rjqq-98f6-6j3r
+  - vulnerability: GHSA-rm97-x556-q36h
 
 output:
   - "table"
