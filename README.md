@@ -39,7 +39,7 @@ MCM Agent provides an administrator-friendly interface for configuring and manag
   - MCM Server
   - HashiCorp Vault
   - SDK Scheme Adapter
-  - Keycloak (OIDC provider)
+  - OIDC provider (e.g., Keycloak)
 
 ## Installation
 
