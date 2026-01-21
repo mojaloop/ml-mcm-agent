@@ -5,6 +5,8 @@ Configuration management agent for Mojaloop Connection Manager (MCM) client with
 ## Overview
 
 MCM Agent provides an administrator-friendly interface for configuring and managing the MCM client, which handles:
+
+![TUI Demo](docs/tui-demo.gif)
 - Certificate lifecycle management via MCM Server
 - SDK scheme-adapter configuration
 - Connection to Vault for PKI operations
