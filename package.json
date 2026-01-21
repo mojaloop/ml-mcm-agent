@@ -1,6 +1,6 @@
 {
   "name": "mcm-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Configuration management agent for Mojaloop MCM client with TUI and CLI",
   "type": "module",
   "engines": {
