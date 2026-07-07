@@ -47,6 +47,7 @@ export class McmClientWrapper extends EventEmitter {
   private logger: Logger;
   private vault?: Vault;
   private stateMachine?: any;
+  private controlServer?: any;
   private authModel?: any;
   private status: McmClientStatus = {
     initialized: false,
@@ -118,7 +119,7 @@ export class McmClientWrapper extends EventEmitter {
         keyLength: this.appConfig.vault.keyLength,
         keyAlgorithm: this.appConfig.vault.keyAlgorithm,
         logger: this.logger,
-        commonName: this.config.vault?.commonName || 'default',
+        commonName: this.config.vault?.commonName || this.config.sdk?.fqdn || 'default',
       });
 
       await this.vault.connect();
@@ -238,6 +239,18 @@ export class McmClientWrapper extends EventEmitter {
       this.logger.info('Starting MCM client state machine');
       await this.stateMachine.start();
 
+      // Start the ControlServer WS so the SDK scheme adapter can connect.
+      // Follows the PM4ML reference: pm4ml/mojaloop-payment-manager-management-api/src/lib/controlServer.ts
+      this.controlServer = new ControlServer.Server({
+        port: this.appConfig.stateMachine.port,
+        logger: this.logger,
+        onRequestConfig: () => this.stateMachine.sendEvent({ type: 'REQUEST_CONNECTOR_CONFIG' }),
+        onRequestPeerJWS: () => this.stateMachine.sendEvent({ type: 'REQUEST_PEER_JWS' }),
+        onUploadPeerJWS: (peerJWS: any) => this.stateMachine.sendEvent({ type: 'UPLOAD_PEER_JWS', data: peerJWS }),
+      });
+      this.controlServer.registerInternalEvents();
+      this.logger.info(`ControlServer WS listening on port ${this.appConfig.stateMachine.port}`);
+
       this.status.running = true;
       this.status.retrying = false;
       this.status.retryAttempt = undefined;
@@ -261,6 +274,7 @@ export class McmClientWrapper extends EventEmitter {
 
     try {
       this.logger.info('Stopping MCM client state machine');
+      await this.controlServer?.stop();
       await this.stateMachine.stop();
       this.vault?.disconnect();
       this.status.running = false;
