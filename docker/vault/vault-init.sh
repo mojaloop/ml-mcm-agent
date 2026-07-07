@@ -75,11 +75,12 @@ vault_api POST /v1/sys/mounts/secret '{"type": "kv-v2"}' > /dev/null
 vault_api POST /v1/sys/mounts/secrets '{"type": "kv"}' > /dev/null
 vault_api POST /v1/sys/mounts/pki/tune '{"max_lease_ttl": "97600h"}' > /dev/null
 
-# Configure PKI
-vault_api POST /v1/pki/config/urls '{"issuing_certificates": "http://127.0.0.1:8233/v1/pki/ca", "crl_distribution_points": "http://127.0.0.1:8233/v1/pki/crl"}' > /dev/null
+# Configure PKI - generate root CA
+vault_api POST /v1/pki/root/generate/internal '{"common_name": "DFSP Root CA", "ttl": "87600h", "key_type": "rsa", "key_bits": 4096}' > /dev/null
+vault_api POST /v1/pki/config/urls '{"issuing_certificates": "http://vault:8200/v1/pki/ca", "crl_distribution_points": "http://vault:8200/v1/pki/crl"}' > /dev/null
 vault_api POST /v1/pki/roles/example.com '{"allowed_domains": "example.com", "allow_subdomains": true, "allow_any_name": true, "allow_localhost": true, "enforce_hostnames": false, "max_ttl": "720h", "key_type": "rsa", "key_bits": 4096}' > /dev/null
 vault_api POST /v1/pki/roles/mcm-server-role '{"allow_any_name": true, "allow_localhost": true, "enforce_hostnames": false, "max_ttl": "4000h", "ttl": "4000h", "key_type": "rsa", "key_bits": 4096}' > /dev/null
-vault_api POST /v1/pki/roles/mcm-client-role '{"allow_any_name": true, "allow_localhost": true, "enforce_hostnames": false, "max_ttl": "4000h", "ttl": "4000h", "key_type": "rsa", "key_bits": 4096}' > /dev/null
+vault_api POST /v1/pki/roles/mcm-client-role '{"allow_any_name": true, "allow_localhost": true, "enforce_hostnames": false, "max_ttl": "4000h", "ttl": "4000h", "key_type": "any"}' > /dev/null
 
 # Create policy
 POLICY=$(cat <<'EOF'
