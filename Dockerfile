@@ -18,6 +18,10 @@ RUN npm prune --production
 # Make CLI globally available
 RUN npm link
 
+# Create config dir with minimal seed (overwritten at runtime by entrypoint)
+RUN mkdir -p /app/config && \
+    echo '{"mcm":{"auth":{"creds":{"clientId":"","clientSecret":""}}}}' > /app/config/default.json
+
 RUN mkdir -p /etc/mcm-agent
 
 EXPOSE 3000
