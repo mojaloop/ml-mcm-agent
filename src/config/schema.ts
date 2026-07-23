@@ -17,6 +17,8 @@ export const mcmSchema = z.object({
     tokenRefreshMarginSeconds: z.number().default(30),
   }).passthrough().optional(),
   hubIamProviderUrl: z.string().optional(),
+  oidcTokenRoute: z.string().default('oauth2/token'),
+  oidcAudience: z.string().optional(),
   certExpiryThresholdDays: z.number().default(30),
 }).passthrough();
 
@@ -35,17 +37,17 @@ export const sdkSchema = z.object({
     r2pBusinessQuotes: z.boolean().default(false),
     r2pDeviceOtp: z.boolean().default(false),
     participantsPut: z.boolean().default(false),
-  }).passthrough(),
+  }).passthrough().default({}),
   jws: z.object({
     sign: z.boolean().default(true),
     validateInbound: z.boolean().default(true),
-  }).passthrough(),
+  }).passthrough().default({}),
   peerEndpoint: z.string().optional(),
   alsEndpoint: z.string().optional(),
   tls: z.object({
     outboundMutual: z.boolean().default(true),
     inboundMutual: z.boolean().default(true),
-  }).passthrough(),
+  }).passthrough().default({}),
   oauth: z.object({
     tokenEndpoint: z.string().refine((val) => !val || z.string().url().safeParse(val).success, {
       message: 'Must be a valid URL or empty',
