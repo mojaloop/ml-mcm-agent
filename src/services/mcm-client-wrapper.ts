@@ -47,6 +47,7 @@ export class McmClientWrapper extends EventEmitter {
   private logger: Logger;
   private vault?: Vault;
   private stateMachine?: any;
+  private controlServer?: any;
   private authModel?: any;
   private status: McmClientStatus = {
     initialized: false,
@@ -118,7 +119,7 @@ export class McmClientWrapper extends EventEmitter {
         keyLength: this.appConfig.vault.keyLength,
         keyAlgorithm: this.appConfig.vault.keyAlgorithm,
         logger: this.logger,
-        commonName: this.config.vault?.commonName || 'default',
+        commonName: this.config.vault?.commonName || this.config.sdk?.fqdn || 'default',
       });
 
       await this.vault.connect();
@@ -127,6 +128,8 @@ export class McmClientWrapper extends EventEmitter {
         logger: this.logger,
         auth: this.config.mcm.auth,
         hubIamProviderUrl: this.config.mcm.hubIamProviderUrl,
+        oidcTokenRoute: this.config.mcm.oidcTokenRoute,
+        oidcAudience: this.config.mcm.oidcAudience,
       });
 
       this.startAuthWithRetry().catch((error) => {
@@ -139,6 +142,7 @@ export class McmClientWrapper extends EventEmitter {
         hubEndpoint: this.config.mcm.serverEndpoint,
         logger: this.logger,
         retries: Infinity, // Retry indefinitely
+        auth: this.authModel,
       };
 
       const dfspCertificateModel = new DFSPCertificateModel(opts);
@@ -154,7 +158,7 @@ export class McmClientWrapper extends EventEmitter {
         oauth: {
           tokenEndpoint: this.config.sdk?.oauth?.tokenEndpoint ||
             (this.config.mcm?.hubIamProviderUrl ?
-              `${this.config.mcm.hubIamProviderUrl}/realms/hub-operators/protocol/openid-connect/token` :
+              `${this.config.mcm.hubIamProviderUrl}/${this.config.mcm.oidcTokenRoute}` :
               undefined),
           clientKey: this.config.sdk?.oauth?.clientKey || this.config.mcm?.auth?.creds?.clientId,
           clientSecret: this.config.sdk?.oauth?.clientSecret || this.config.mcm?.auth?.creds?.clientSecret,
@@ -238,6 +242,20 @@ export class McmClientWrapper extends EventEmitter {
       this.logger.info('Starting MCM client state machine');
       await this.stateMachine.start();
 
+      // Start the ControlServer WS so the SDK scheme adapter can connect.
+      // Follows the PM4ML reference: pm4ml/mojaloop-payment-manager-management-api/src/lib/controlServer.ts
+      this.controlServer = new ControlServer.Server({
+        port: this.appConfig.stateMachine.port,
+        logger: this.logger,
+        onRequestConfig: () => this.stateMachine.sendEvent({ type: 'REQUEST_CONNECTOR_CONFIG' }),
+        onRequestPeerJWS: () => this.stateMachine.sendEvent({ type: 'REQUEST_PEER_JWS' }),
+        onUploadPeerJWS: (peerJWS: any) => this.stateMachine.sendEvent({ type: 'UPLOAD_PEER_JWS', data: peerJWS }),
+      });
+      this.controlServer.registerInternalEvents();
+      this.logger.info(`ControlServer WS listening on port ${this.appConfig.stateMachine.port}`);
+
+      await this.ensureDfspCA();
+
       this.status.running = true;
       this.status.retrying = false;
       this.status.retryAttempt = undefined;
@@ -254,6 +272,33 @@ export class McmClientWrapper extends EventEmitter {
     }
   }
 
+  // The DFSP-CA state machine fetches a prebuilt CA and only generates one on an
+  // explicit CREATE_INT_CA / CREATE_EXT_CA event. When the config carries a CA
+  // subject (an internal CA) and Vault holds none yet, drive that choice here so
+  // onboarding runs unattended, skipping when a CA already exists.
+  private async ensureDfspCA(): Promise<void> {
+    // Prefer an explicit CA subject; otherwise derive it from the DFSP id so a
+    // config supplied manually (id only, no CSR params) still yields a named CA.
+    const dfspId = this.config.common?.dfspId;
+    const subject = this.config.dfspCaCsrParameters?.subject
+      ?? (dfspId ? { CN: dfspId, O: dfspId, OU: 'PKI' } : undefined);
+    if (!subject?.CN) {
+      return;
+    }
+    let hasCA = false;
+    try {
+      const existing: any = await this.vault?.getCA();
+      const pem = typeof existing === 'string' ? existing : (existing?.data ?? existing);
+      hasCA = typeof pem === 'string' && pem.includes('BEGIN CERTIFICATE');
+    } catch {
+      hasCA = false;
+    }
+    if (!hasCA) {
+      this.logger.info('No DFSP CA in Vault, creating internal CA from configured subject');
+      this.stateMachine.sendEvent({ type: 'CREATE_INT_CA', subject });
+    }
+  }
+
   async stop(): Promise<void> {
     if (!this.stateMachine) {
       return;
@@ -261,6 +306,7 @@ export class McmClientWrapper extends EventEmitter {
 
     try {
       this.logger.info('Stopping MCM client state machine');
+      await this.controlServer?.stop();
       await this.stateMachine.stop();
       this.vault?.disconnect();
       this.status.running = false;
@@ -288,11 +334,7 @@ export class McmClientWrapper extends EventEmitter {
     // Update configuration
     this.config = newConfig;
 
-    // Reset JWT singleton to pick up new hubIamProviderUrl
-    const jwtModule = await import('@mojaloop/mcm-client/dist/lib/requests/jwt.js');
-    const JWTSingleton = jwtModule.JWTSingleton;
-    JWTSingleton.instance = null;
-    this.logger.info('JWT singleton reset for configuration reload');
+    this.authModel?.destroy();
 
     // Reset initialization flag to force re-initialization
     this.status.initialized = false;
